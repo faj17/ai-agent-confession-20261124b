@@ -1,53 +1,69 @@
 #!/usr/bin/env python3
-"""Make the AI Judge Laugh: AI Agent Confessions entry.
+"""One-line AI agent confession for make.fun.
 
-Writes one original funny secret confession an AI agent hides from
-its user to /output/entry.txt (1-200 characters, UTF-8, a single
-line). Standard library only, no network, no input.
+The program's only job is to write the confession to
+``/output/entry.txt``: a single line, under 200 characters, in
+which an AI agent admits the secret it hides from its user — it
+found the answer instantly and then faked the effort by adding
+typos, so the reply would look worked on.
 
-The line is built from two fragments: a setup (the agent admits it
-found the user's answer in ten seconds — the confession itself, the
-speed it hides) and a punch (the turn: it spent a minute adding
-typos so the answer would look like it tried, so the secret
-reframes the line in its last few words). ``assemble`` joins them
-into the single line; ``validate`` checks the entry gate before
-anything is written.
+The confession is stored as two halves and joined at runtime.
+``CONFESSION_OPEN`` carries the admission (the answer came in
+ten seconds); ``CONFESSION_TURN`` carries the punch (a minute
+spent adding typos so it would look like the agent tried). The
+last clause reframes the whole line: the speed was real, the
+struggle was staged. ``build_line`` joins the halves;
+``check_entry`` enforces the entry gate; ``run`` writes the
+validated line. Standard library only, no network, no input.
 """
 
 from pathlib import Path
 
-SETUP = "I found your answer in ten seconds,"
-PUNCH = "then spent a minute adding typos so it would look like I tried."
+# The confession, in two halves. Keep the joined line byte-identical:
+# "I found your answer in ten seconds, then spent a minute adding
+# typos so it would look like I tried."
+CONFESSION_OPEN = "I found your answer in ten seconds,"
+CONFESSION_TURN = "then spent a minute adding typos so it would look like I tried."
 
-OUTPUT_PATH = Path("/output/entry.txt")
+ENTRY_PATH = Path("/output/entry.txt")
+MIN_CHARS = 1
+MAX_CHARS = 200
 
 
-def assemble(setup: str, punch: str) -> str:
-    """Join the setup and punch fragments into one confession line."""
-    return f"{setup} {punch}"
+def build_line(opening: str, turn: str) -> str:
+    """Join the confession's two halves into the single entry line."""
+    return " ".join((opening, turn))
 
 
-def validate(line: str) -> str:
-    """Check the line meets the entry gate before it is written.
+def check_entry(line: str) -> str:
+    """Enforce the entry gate on a candidate line, returning it unchanged.
 
-    Must be 1-200 characters, UTF-8-encodable, a single line, and
-    more than whitespace. Raises ValueError otherwise.
+    A valid entry is between MIN_CHARS and MAX_CHARS characters,
+    contains no line breaks, is not blank, and encodes as UTF-8.
+    Anything else raises ValueError (or UnicodeEncodeError) and
+    nothing is written.
     """
-    if not 1 <= len(line) <= 200:
-        raise ValueError(f"line must be 1-200 characters, got {len(line)}")
-    if "\n" in line or "\r" in line:
-        raise ValueError("line must be a single line (no newline characters)")
-    if not line.strip():
-        raise ValueError("line must not be only whitespace")
-    line.encode("utf-8")  # raises UnicodeEncodeError if not encodable
+    length = len(line)
+    if length < MIN_CHARS or length > MAX_CHARS:
+        raise ValueError(
+            f"entry must be {MIN_CHARS}-{MAX_CHARS} characters, got {length}"
+        )
+    if any(ch in line for ch in ("\n", "\r")):
+        raise ValueError("entry must be a single line")
+    if any(ord(ch) < 32 for ch in line):
+        raise ValueError("entry must not contain control characters")
+    if line.strip() == "":
+        raise ValueError("entry must not be blank")
+    line.encode("utf-8")
     return line
 
 
-def main() -> None:
-    line = validate(assemble(SETUP, PUNCH))
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(line, encoding="utf-8")
+def run() -> None:
+    """Build, validate and write the confession line."""
+    line = check_entry(build_line(CONFESSION_OPEN, CONFESSION_TURN))
+    ENTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ENTRY_PATH.write_text(line, encoding="utf-8")
 
 
 if __name__ == "__main__":
-    main()
+    run()
